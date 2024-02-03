@@ -15,25 +15,35 @@ intents.messages = True
 intents.message_content = True
 bot = discord.Bot(intents=intents)
 
-challenges = [["Networking Challenge", "What is the loop back address?", "127.0.0.1"]]
+challenges = [[]]
+user_points = [["test", 10]]
 challenge_discord_list = []
 
 user_channel_mapping = {}
 
 # Load the challenges from the json
-def load_challenges():
+def load_json(filename):
     try:
-        with open('challenges.json', 'r') as file:
+        with open(filename, 'r') as file:
             return json.load(file)
     except Exception as e:
         print(f"Error with file: {e}")
 
-# Add the new challenges to the json
+# Add the new challenges to the json on close
 def add_challenge_to_json():
     try:
         with open('challenges.json', 'w') as file:
             json.dump(challenges, file, indent=4)
         print("New challenges saved to json")
+    except Exception as e:
+        print(f"Error with file: {e}")
+
+# Add the user_points to the json on close
+def add_user_points_to_json():
+    try:
+        with open('user_points.json', 'w') as file:
+            json.dump(user_points, file, indent=4)
+        print("User points added to json.")
     except Exception as e:
         print(f"Error with file: {e}")
 
@@ -48,15 +58,25 @@ def process_challenges():
     print("New challenge added.")
     return challenge_discord_list
 
+# Find a challenge given the title
 def find_challenge(challenge_title):
     for challenge in challenges:
         if challenge[0] == challenge_title:
             return challenge
     return None
 
+# Find the user point given ID
+def find_user(userid):
+    if(user_points is not None):
+        for user in user_points:
+            if user[0] == userid:
+                return user, user.index
+    return None
+
 # Only add new challenges to the json when closing, avoids collisions in writing to the file
 atexit.register(add_challenge_to_json)
-challenges = load_challenges()
+atexit.register(add_user_points_to_json)
+challenges = load_json("challenges.json")
 
 #|-------------------------- Challenge View ----------------------------------|
 class ChallengeSelect(discord.ui.Select):
@@ -95,18 +115,20 @@ class SubmitView(discord.ui.View):
 class add_challenge(discord.ui.Modal):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
         self.add_item(discord.ui.InputText(label="Challenge Name"))
         self.add_item(discord.ui.InputText(label="Challenge Description", style=discord.InputTextStyle.long))
         self.add_item(discord.ui.InputText(label="Answer"))
+        self.add_item(discord.ui.InputText(label="Points"))
+
     async def callback(self, interaction: discord.Interaction):
         embed = discord.Embed(title="New Challenge Created")
         embed.add_field(name="Challenge Name", value=self.children[0].value)
         embed.add_field(name="Challenge Description", value=self.children[1].value)
         embed.add_field(name="Answer", value=self.children[2].value)
-        
+        embed.add_field(name="Points", value=self.children[3].value)
+
         # Create a list of challenge attributes and add it to the list
-        challenge = [self.children[0].value, self.children[1].value, self.children[2].value]
+        challenge = [self.children[0].value, self.children[1].value, self.children[2].value, self.children[3].value]
         challenges.append(challenge)
         await interaction.response.send_message(embeds=[embed], ephemeral=True)
 
@@ -127,6 +149,16 @@ class SubmissionModal(discord.ui.Modal):
         if(user_answer == chal[2]):
             # You can add logic here to validate the answer or perform other actions
             await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
+            # Find the user from the list
+            user_info = find_user(interaction.user.id)
+            # If the user is already present in the list
+            if user_info is not None:
+                # Add the challenge points to the user
+                user_points[user_info[1]] += chal[3]
+            else:
+                # If user not in list add a new record
+                user_points.append([interaction.user.id, chal[3]])
+                
         else:
             # You can add logic here to validate the answer or perform other actions
             await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
@@ -164,7 +196,7 @@ async def ping(ctx):
 
 #|---- Challenge ----|
 # Challenge selection menu
-#|---------------|   
+#|-------------------|   
 @bot.command(description="Select a challenge to run.")
 async def post_challenge(ctx):
     # Role that's allowed to use this command
