@@ -15,10 +15,18 @@ intents.messages = True
 intents.message_content = True
 bot = discord.Bot(intents=intents)
 
-meeting_key = "Lab_Talk!"
+meeting_key = str(os.getenv("MEETING_TOKEN"))
 challenges = [[]]
 user_points = [["test", 10]]
 challenge_discord_list = []
+allowed_role = "CyberHogs Officers"
+
+# Define your roles and points thresholds
+roles_points = {
+    "Beginner": 5,   # Role name and points required for this role
+    "Intermediate": 50,
+    "Advanced": 100,
+}
 
 user_channel_mapping = {}
 
@@ -69,10 +77,38 @@ def find_challenge(challenge_title):
 # Find the user point given ID
 def find_user(userid):
     if(user_points is not None):
-        for user in user_points:
+        for index, user in enumerate(user_points):
             if user[0] == userid:
-                return user, user.index
+                return user, index
     return None
+
+# Role creation and assignment
+async def assign_or_create_role(guild, member, role_name, total_points):
+    # Attempt to find the role within the guild
+    role = discord.utils.get(guild.roles, name=role_name)
+
+    # If the role does not exist, create it
+    if role is None:
+        try:
+            print(f"Creating new role: {role_name}")
+            role = await guild.create_role(name=role_name)
+            # Optionally set role permissions, color, etc.
+        except discord.Forbidden:
+            print("I do not have permission to create roles.")
+            return
+        except discord.HTTPException:
+            print("Creating role failed.")
+            return
+
+    # Check if the member already has the role
+    if role not in member.roles:
+        try:
+            await member.add_roles(role)
+            await member.send(f"Congratulations! You've been promoted to {role_name}.")
+        except discord.Forbidden:
+            print("I don't have permission to add roles.")
+        except discord.HTTPException:
+            print("Adding role failed.")
 
 # Only add new challenges to the json when closing, avoids collisions in writing to the file
 atexit.register(add_challenge_to_json)
@@ -89,7 +125,7 @@ class ChallengeSelect(discord.ui.Select):
         
         print(f"Channel context found, sending selected challenge...")
         chal = find_challenge(self.values[0])
-        await channel_ctx.send(f"{self.values[0]} selected...\n{chal[1]}")
+        #await channel_ctx.send(f"{self.values[0]} selected...\n{chal[1]}")
         await channel_ctx.send(view=SubmitView(self.values[0]))
 
 class ChallengeView(discord.ui.View):
@@ -129,7 +165,7 @@ class add_challenge(discord.ui.Modal):
         embed.add_field(name="Points", value=self.children[3].value)
 
         # Create a list of challenge attributes and add it to the list
-        challenge = [self.children[0].value, self.children[1].value, self.children[2].value, self.children[3].value]
+        challenge = [self.children[0].value, self.children[1].value, self.children[2].value, int(self.children[3].value)]
         challenges.append(challenge)
         await interaction.response.send_message(embeds=[embed], ephemeral=True)
 
@@ -154,13 +190,28 @@ class SubmissionModal(discord.ui.Modal):
                 await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
                 # Find the user from the list
                 user_info = find_user(interaction.user.id)
+                total_points = 0
                 # If the user is already present in the list
                 if user_info is not None:
+                    user_index = user_info[1]
                     # Add the challenge points to the user
-                    user_points[user_info[1]] += chal[3]
+                    user_points[user_index][1] += chal[3]
+                    total_points += user_points[user_index]
                 else:
                     # If user not in list add a new record
                     user_points.append([interaction.user.id, chal[3]])
+                    total_points = chal[3]
+
+                # Fetch the member object
+                guild = interaction.guild
+                member = await guild.fetch_member(interaction.user.id) 
+
+                # Assign roles based on points
+                for role_name, points_required in roles_points.items():
+                    if total_points >= points_required:
+                        print("Sending to assign role...")
+                        await assign_or_create_role(guild, member, role_name, total_points)
+                        break
                     
             else:
                 await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
@@ -181,7 +232,13 @@ async def on_ready():
 @bot.slash_command()
 async def challenge_modal(ctx: discord.ApplicationContext):
     modal = add_challenge(title="Add a Challenge")
-    await ctx.send_modal(modal)
+
+    # Check if user has the role
+    if any(role.name == allowed_role for role in ctx.author.roles):
+        await ctx.send_modal(modal)
+    else:
+        await ctx.author.send("You do not have the required role to use this command.")
+    
 
 #|---- Hello ----|
 # Returns a warm welcome from the bot
@@ -203,7 +260,7 @@ async def ping(ctx):
 @bot.command(description="Select a challenge to run.")
 async def post_challenge(ctx):
     # Role that's allowed to use this command
-    allowed_role = "CyberHogs Officer"  # Replace with the actual role name
+    
     await ctx.respond("Look at your DMs...")
 
     user_channel_mapping[ctx.author.id] = ctx
