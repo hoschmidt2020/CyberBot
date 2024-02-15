@@ -15,6 +15,7 @@ intents.messages = True
 intents.message_content = True
 bot = discord.Bot(intents=intents)
 
+meeting_key = "Lab_Talk!"
 challenges = [[]]
 user_points = [["test", 10]]
 challenge_discord_list = []
@@ -137,32 +138,34 @@ class SubmissionModal(discord.ui.Modal):
     def __init__(self, challenge_title, *args, **kwargs):
         super().__init__(title=f"Submit your answer for {challenge_title}", *args, **kwargs)
         self.challenge_title = challenge_title
-        self.add_item(discord.ui.InputText(
-            label="Your Answer",
-            placeholder="Type your answer here..."
-        ))
+        self.add_item(discord.ui.InputText(label="Challenge Key", placeholder="Enter the meeting key..."))
+        self.add_item(discord.ui.InputText(label="Your Answer", placeholder="Type your answer here..."))
 
     async def callback(self, interaction: discord.Interaction):
         chal = find_challenge(self.challenge_title)
-        user_answer = self.children[0].value
 
-        if(user_answer == chal[2]):
-            # You can add logic here to validate the answer or perform other actions
-            await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
-            # Find the user from the list
-            user_info = find_user(interaction.user.id)
-            # If the user is already present in the list
-            if user_info is not None:
-                # Add the challenge points to the user
-                user_points[user_info[1]] += chal[3]
+        # Grab the meeting key and answer from the user
+        user_key_input = self.children[0].value
+        user_answer = self.children[1].value
+
+        # Check to see if the user inputted the correct meeting key
+        if user_key_input == meeting_key:
+            if(user_answer == chal[2]):
+                await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
+                # Find the user from the list
+                user_info = find_user(interaction.user.id)
+                # If the user is already present in the list
+                if user_info is not None:
+                    # Add the challenge points to the user
+                    user_points[user_info[1]] += chal[3]
+                else:
+                    # If user not in list add a new record
+                    user_points.append([interaction.user.id, chal[3]])
+                    
             else:
-                # If user not in list add a new record
-                user_points.append([interaction.user.id, chal[3]])
-                
+                await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
         else:
-            # You can add logic here to validate the answer or perform other actions
-            await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
-    
+            await interaction.response.send_message(f"Incorrect meeting key...", ephemeral=True)
 
 #|-------------------------- Events --------------------------------|          
 
