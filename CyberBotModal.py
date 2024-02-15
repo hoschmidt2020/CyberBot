@@ -20,12 +20,13 @@ challenges = [[]]
 user_points = [["test", 10]]
 challenge_discord_list = []
 allowed_role = "CyberHogs Officers"
+users_with_correct_answers = []
 
 # Define your roles and points thresholds
 roles_points = {
-    "Beginner": 5,   # Role name and points required for this role
-    "Intermediate": 50,
-    "Advanced": 100,
+    "Script Kiddie": 10,   # Role name and points required for this role
+    "Hacktivist": 20,
+    "APT": 50,
 }
 
 user_channel_mapping = {}
@@ -120,12 +121,13 @@ class ChallengeSelect(discord.ui.Select):
     def __init__(self, options, *args, **kwargs):
         super().__init__(placeholder="Select a challenge:", max_values=1, min_values=1, options=options)
         
-    async def callback(self, interaction: discord.Interaction): # the function called when the user is done selecting options
+    async def callback(self, interaction: discord.Interaction):
         channel_ctx = user_channel_mapping[interaction.user.id]
         
         print(f"Channel context found, sending selected challenge...")
         chal = find_challenge(self.values[0])
-        #await channel_ctx.send(f"{self.values[0]} selected...\n{chal[1]}")
+        await channel_ctx.send(f"{chal[1]}\n")
+        users_with_correct_answers = []
         await channel_ctx.send(view=SubmitView(self.values[0]))
 
 class ChallengeView(discord.ui.View):
@@ -144,9 +146,14 @@ class SubmitButton(discord.ui.Button):
 
 class SubmitView(discord.ui.View):
     def __init__(self, title, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(timeout=1800)
         self.title = title
         self.add_item(SubmitButton(self.title))
+    
+    async def on_timeout(self):
+        users_with_correct_answers = []
+        for item in self.children:
+            item.disabled = True
         
 #|-------------------------- Challenge Modal ---------------------------------|
 class add_challenge(discord.ui.Modal):
@@ -183,38 +190,43 @@ class SubmissionModal(discord.ui.Modal):
         # Grab the meeting key and answer from the user
         user_key_input = self.children[0].value
         user_answer = self.children[1].value
-
-        # Check to see if the user inputted the correct meeting key
-        if user_key_input == meeting_key:
-            if(user_answer == chal[2]):
-                await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
-                # Find the user from the list
-                user_info = find_user(interaction.user.id)
-                total_points = 0
-                # If the user is already present in the list
-                if user_info is not None:
-                    user_index = user_info[1]
-                    # Add the challenge points to the user
-                    user_points[user_index][1] += chal[3]
-                    total_points += user_points[user_index]
-                else:
-                    # If user not in list add a new record
-                    user_points.append([interaction.user.id, chal[3]])
-                    total_points = chal[3]
-
-                # Fetch the member object
-                guild = interaction.guild
-                member = await guild.fetch_member(interaction.user.id) 
-
-                # Assign roles based on points
-                for role_name, points_required in roles_points.items():
-                    if total_points >= points_required:
-                        print("Sending to assign role...")
-                        await assign_or_create_role(guild, member, role_name, total_points)
-                        break
+        
+        if user_key_input == meeting_key: # Check to see if the user inputted the correct meeting key
+            if interaction.user.id not in users_with_correct_answers: # Check to see if the user submitted a correct answer already
+                if(user_answer == chal[2]):
                     
+                    await interaction.response.send_message(f"Your answer '{user_answer}' is correct!", ephemeral=True)
+                    # Find the user from the list
+                    user_info = find_user(interaction.user.id)
+                    total_points = 0
+                    users_with_correct_answers.append(interaction.user.id) # Add user to correct answer list
+
+                    # If the user is already present in the list
+                    if user_info is not None:
+                        user_index = user_info[1]
+                        # Add the challenge points to the user
+                        user_points[user_index][1] += chal[3]
+                        total_points += user_points[user_index]
+                    else:
+                        # If user not in list add a new record
+                        user_points.append([interaction.user.id, chal[3]])
+                        total_points = chal[3]
+
+                    # Fetch the member object
+                    guild = interaction.guild
+                    member = await guild.fetch_member(interaction.user.id) 
+
+                    # Assign roles based on points
+                    for role_name, points_required in roles_points.items():
+                        if total_points >= points_required:
+                            print("Sending to assign role...")
+                            await assign_or_create_role(guild, member, role_name, total_points)
+                            break
+                    
+                else:
+                    await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
             else:
-                await interaction.response.send_message(f"Your answer '{user_answer}' is incorrect...", ephemeral=True)
+                    await interaction.response.send_message(f"You already submitted a correct answer...", ephemeral=True)
         else:
             await interaction.response.send_message(f"Incorrect meeting key...", ephemeral=True)
 
