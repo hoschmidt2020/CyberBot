@@ -83,6 +83,12 @@ def find_user(userid):
                 return user, index
     return None
 
+def change_token(token):
+    dotenv.set_key('.env', "MEETING_TOKEN", token)
+    dotenv.load_dotenv()
+    meeting_key = str(os.getenv("MEETING_TOKEN"))
+    print(f"Meeting key loaded: {meeting_key}") 
+    
 # Role creation and assignment
 async def assign_or_create_role(guild, member, role_name, total_points):
     # Attempt to find the role within the guild
@@ -154,7 +160,16 @@ class SubmitView(discord.ui.View):
         users_with_correct_answers = []
         for item in self.children:
             item.disabled = True
-        
+#|-------------------------- Token Modal ---------------------------------|
+class TokenChange(discord.ui.Modal):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_item(discord.ui.InputText(label="Meeting Token"))
+    
+    async def callback(self, interaction: discord.Interaction):
+        new_token = self.children[0].value
+        change_token(new_token)
+        await interaction.response.send_message("Updated meeting token...", ephemeral=True)
 #|-------------------------- Challenge Modal ---------------------------------|
 class add_challenge(discord.ui.Modal):
     def __init__(self, *args, **kwargs) -> None:
@@ -211,7 +226,7 @@ class SubmissionModal(discord.ui.Modal):
                         # If user not in list add a new record
                         user_points.append([interaction.user.id, chal[3]])
                         total_points = chal[3]
-
+                        
                     # Fetch the member object
                     guild = interaction.guild
                     member = await guild.fetch_member(interaction.user.id) 
@@ -283,4 +298,17 @@ async def post_challenge(ctx):
     else:
         await ctx.author.send("You do not have the required role to use this command.")
 
+#|---- Change Token ----|
+# Change the meeting token remotely
+#|-------------------|   
+@bot.command(description="Officer Use Only")
+async def meeting_token(ctx):
+    user_channel_mapping[ctx.author.id] = ctx
+
+    # Check if user has the role
+    if any(role.name == allowed_role for role in ctx.author.roles):
+        await ctx.send_modal(TokenChange(title="Change Meeting Token"))
+    else:
+        await ctx.author.send("You do not have the required role to use this command.") 
+    
 bot.run(token)
