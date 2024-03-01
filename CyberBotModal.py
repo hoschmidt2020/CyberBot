@@ -321,7 +321,7 @@ async def token_check(ctx):
 
     # Check if user has the role
     if any(role.name == allowed_role for role in ctx.author.roles):
-        await ctx.auther.send(f"Current token: {meeting_key}")
+        await ctx.author.send(f"Current token: {meeting_key}")
     else:
         await ctx.author.send("You do not have the required role to use this command.") 
     
