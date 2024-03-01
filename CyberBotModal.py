@@ -152,7 +152,7 @@ class SubmitButton(discord.ui.Button):
 
 class SubmitView(discord.ui.View):
     def __init__(self, title, *args, **kwargs):
-        super().__init__(timeout=1800)
+        super().__init__(timeout=6000)
         self.title = title
         self.add_item(SubmitButton(self.title))
     
@@ -284,7 +284,7 @@ async def ping(ctx):
 #|---- Challenge ----|
 # Challenge selection menu
 #|-------------------|   
-@bot.command(description="Select a challenge to run.")
+@bot.command(description="Officer Use Only | Select a challenge to run.")
 async def post_challenge(ctx):
     # Role that's allowed to use this command
     
@@ -301,7 +301,7 @@ async def post_challenge(ctx):
 #|---- Change Token ----|
 # Change the meeting token remotely
 #|-------------------|   
-@bot.command(description="Officer Use Only")
+@bot.command(description="Officer Use Only | Change Meeting Token")
 async def meeting_token(ctx):
     user_channel_mapping[ctx.author.id] = ctx
 
@@ -310,5 +310,20 @@ async def meeting_token(ctx):
         await ctx.send_modal(TokenChange(title="Change Meeting Token"))
     else:
         await ctx.author.send("You do not have the required role to use this command.") 
+
+
+#|---- Change Token ----|
+# Change the meeting token remotely
+#|-------------------|   
+@bot.command(description="Officer Use Only | Check the meeting token")
+async def token_check(ctx):
+    user_channel_mapping[ctx.author.id] = ctx
+
+    # Check if user has the role
+    if any(role.name == allowed_role for role in ctx.author.roles):
+        await ctx.auther.send(f"Current token: {meeting_key}")
+    else:
+        await ctx.author.send("You do not have the required role to use this command.") 
     
+
 bot.run(token)
