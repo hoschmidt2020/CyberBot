@@ -170,6 +170,7 @@ class TokenChange(discord.ui.Modal):
         new_token = self.children[0].value
         change_token(new_token)
         await interaction.response.send_message("Updated meeting token...", ephemeral=True)
+        
 #|-------------------------- Challenge Modal ---------------------------------|
 class add_challenge(discord.ui.Modal):
     def __init__(self, *args, **kwargs) -> None:
@@ -194,7 +195,7 @@ class add_challenge(discord.ui.Modal):
 #|-------------------------- Submission Modal ---------------------------------|
 class SubmissionModal(discord.ui.Modal):
     def __init__(self, challenge_title, *args, **kwargs):
-        super().__init__(title=f"Submit your answer for {challenge_title}", *args, **kwargs)
+        super().__init__(title=f"Submit challenge flag...", *args, **kwargs)
         self.challenge_title = challenge_title
         self.add_item(discord.ui.InputText(label="Challenge Key", placeholder="Enter the meeting key..."))
         self.add_item(discord.ui.InputText(label="Your Answer", placeholder="Type your answer here..."))
