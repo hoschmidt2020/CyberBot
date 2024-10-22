@@ -1,13 +1,13 @@
 import discord
 from discord.ui.item import Item
-import dotenv
+from dotenv import load_dotenv
 import os
 from discord.ext import commands
 import json
 import atexit
 
 #|-------------------------- Bot Initialization ------------------------------|
-dotenv.load_dotenv()
+load_dotenv()
 token = str(os.getenv("TOKEN"))
 
 intents = discord.Intents.default()
@@ -15,6 +15,7 @@ intents.messages = True
 intents.message_content = True
 bot = discord.Bot(intents=intents)
 
+CATEGORY_NAME = "RazorHack"
 meeting_key = str(os.getenv("MEETING_TOKEN"))
 challenges = [[]]
 user_points = [["test", 10]]
@@ -84,8 +85,8 @@ def find_user(userid):
     return None
 
 def change_token(token):
-    dotenv.set_key('.env', "MEETING_TOKEN", token)
-    dotenv.load_dotenv()
+    os.environ["MEETING_TOKEN"] = token
+    load_dotenv()
     meeting_key = str(os.getenv("MEETING_TOKEN"))
     print(f"Meeting key loaded: {meeting_key}") 
     
@@ -254,6 +255,61 @@ async def on_ready():
 
 #|-------------------------- Commands ------------------------------|
 
+#|---- Create a Team Channel ----|
+# Create a team channel
+#|-----------------------------|
+# Command to create a private team channel in the RazorHack category
+@bot.slash_command(name="create_team", description="Create a private team channel.")
+async def create_team_channel(ctx: discord.ApplicationContext, team_name: str):
+    guild = ctx.guild
+
+    # Find the hardcoded category 'RazorHack'
+    category = discord.utils.get(guild.categories, name=CATEGORY_NAME)
+    if category is None:
+        await ctx.respond(f"Category '{CATEGORY_NAME}' not found.", ephemeral=True)
+        return
+
+    # Create the overwrites for permissions (only the user and bot can see initially)
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),  # Hide for everyone
+        ctx.author: discord.PermissionOverwrite(view_channel=True),  # Allow creator to see it
+    }
+
+    # Create the private text channel under 'RazorHack' category
+    try:
+        team_channel = await guild.create_text_channel(team_name, category=category, overwrites=overwrites)
+        await ctx.respond(f"Private channel '{team_name}' created in the '{CATEGORY_NAME}' category!", ephemeral=True)
+    except discord.HTTPException as e:
+        await ctx.respond(f"Failed to create the channel: {str(e)}", ephemeral=True)
+
+
+#|---- Join a Team Channel ----|
+# Join a premade team channel
+#|-----------------------------|
+# Command to allow a user to join an existing private team channel by name
+@bot.slash_command(name= "join_team", description="Join a private team channel by providing a team name.")
+async def join_team_channel(ctx: discord.ApplicationContext, team_name: str):
+    guild = ctx.guild
+
+    # Find the hardcoded category 'RazorHack'
+    category = discord.utils.get(guild.categories, name=CATEGORY_NAME)
+    if category is None:
+        await ctx.respond(f"Category '{CATEGORY_NAME}' not found.", ephemeral=True)
+        return
+
+    # Look for the channel inside the 'RazorHack' category
+    team_channel = discord.utils.get(guild.text_channels, name=team_name, category=category)
+    if team_channel is None:
+        await ctx.respond(f"No channel found with the name '{team_name}' in the '{CATEGORY_NAME}' category.", ephemeral=True)
+        return
+
+    # Add the user to the channel by updating channel permissions
+    try:
+        await team_channel.set_permissions(ctx.author, view_channel=True)
+        await ctx.respond(f"You have been added to the team channel '{team_name}'!", ephemeral=True)
+    except discord.HTTPException as e:
+        await ctx.respond(f"Failed to add you to the channel: {str(e)}", ephemeral=True)
+
 #|---- Add a Challenge ----|
 # Use a modal to add a challenge to the challenge list
 #|-------------------------|   
@@ -267,7 +323,6 @@ async def challenge_modal(ctx: discord.ApplicationContext):
     else:
         await ctx.author.send("You do not have the required role to use this command.")
     
-
 #|---- Hello ----|
 # Returns a warm welcome from the bot
 #|---------------|   
@@ -311,7 +366,6 @@ async def meeting_token(ctx):
         await ctx.send_modal(TokenChange(title="Change Meeting Token"))
     else:
         await ctx.author.send("You do not have the required role to use this command.") 
-
 
 #|---- Change Token ----|
 # Change the meeting token remotely
