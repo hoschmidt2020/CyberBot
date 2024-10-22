@@ -259,7 +259,7 @@ async def on_ready():
 # Create a team channel
 #|-----------------------------|
 # Command to create a private team channel in the RazorHack category
-@bot.slash_command(name="create_team", description="Create a private team channel.")
+@bot.slash_command(name="create_team", description="Create a private team channel.", guild_ids=[936403503407059014])
 async def create_team_channel(ctx: discord.ApplicationContext, team_name: str):
     guild = ctx.guild
 
@@ -273,6 +273,7 @@ async def create_team_channel(ctx: discord.ApplicationContext, team_name: str):
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),  # Hide for everyone
         ctx.author: discord.PermissionOverwrite(view_channel=True),  # Allow creator to see it
+        guild.me: discord.PermissionOverwrite(view_channel=True, manage_channels=True),  # Bot permission
     }
 
     # Create the private text channel under 'RazorHack' category
@@ -282,12 +283,11 @@ async def create_team_channel(ctx: discord.ApplicationContext, team_name: str):
     except discord.HTTPException as e:
         await ctx.respond(f"Failed to create the channel: {str(e)}", ephemeral=True)
 
-
 #|---- Join a Team Channel ----|
 # Join a premade team channel
 #|-----------------------------|
 # Command to allow a user to join an existing private team channel by name
-@bot.slash_command(name= "join_team", description="Join a private team channel by providing a team name.")
+@bot.slash_command(name= "join_team", description="Join a private team channel by providing a team name.", guild_ids=[936403503407059014])
 async def join_team_channel(ctx: discord.ApplicationContext, team_name: str):
     guild = ctx.guild
 
